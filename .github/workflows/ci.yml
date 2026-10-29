@@ -16,7 +16,7 @@ jobs:
   lint-scripts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: shellcheck
         run: shellcheck -x scripts/*.sh
       - name: actionlint
@@ -25,9 +25,9 @@ jobs:
           ./actionlint -color
 
   swift:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Select Xcode
         run: ./scripts/select-xcode.sh
       - name: Format check
@@ -45,7 +45,7 @@ jobs:
       - name: Package
         id: package
         run: echo "zip=$(./scripts/package.sh)" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: OverscrollEmit.app
           path: ${{ steps.package.outputs.zip }}
