@@ -7,11 +7,11 @@ import OverscrollEmitCore
 final class RequestServer {
     private static let rememberedIDCount = 64
 
-    private let handler: @MainActor (AppCommand) -> String?
+    private let handler: @MainActor (AppCommand) -> Result<String?, CommandFailure>
     private var recentIDs: [String] = []
     private var observer: NSObjectProtocol?
 
-    init(handler: @escaping @MainActor (AppCommand) -> String?) {
+    init(handler: @escaping @MainActor (AppCommand) -> Result<String?, CommandFailure>) {
         self.handler = handler
         observer = DistributedNotificationCenter.default().addObserver(
             forName: IPC.requestName, object: nil, queue: .main
@@ -28,11 +28,14 @@ final class RequestServer {
         }
         guard !recentIDs.contains(envelope.id) else {
             // Duplicate re-post: the previous ack may have been missed, so ack again without re-running.
-            ack(AckEnvelope(id: envelope.id, error: nil))
+            ack(AckEnvelope(id: envelope.id, error: nil, output: nil))
             return
         }
         recentIDs = Array((recentIDs + [envelope.id]).suffix(Self.rememberedIDCount))
-        ack(AckEnvelope(id: envelope.id, error: handler(envelope.command)))
+        switch handler(envelope.command) {
+        case .success(let output): ack(AckEnvelope(id: envelope.id, error: nil, output: output))
+        case .failure(let failure): ack(AckEnvelope(id: envelope.id, error: failure.message, output: nil))
+        }
     }
 
     private func ack(_ envelope: AckEnvelope) {
@@ -41,4 +44,8 @@ final class RequestServer {
             IPC.ackName, object: nil, userInfo: [IPC.payloadKey: payload], deliverImmediately: true
         )
     }
+}
+
+struct CommandFailure: Error {
+    let message: String
 }

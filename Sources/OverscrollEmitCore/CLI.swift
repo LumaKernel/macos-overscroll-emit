@@ -37,7 +37,7 @@ public enum CLIParser {
         case Side.right.rawValue: return parseFlash(side: .right, rest)
         case "settings": return noArguments(rest, .send(.settings))
         case "quit": return noArguments(rest, .send(.quit))
-        case "displays": return noArguments(rest, .displays)
+        case "displays": return noArguments(rest, .send(.describeDisplays))
         case "version", "--version": return noArguments(rest, .version)
         case "help", "--help", "-h": return noArguments(rest, .help)
         default: return .failure(.unknownCommand(head))
@@ -183,8 +183,8 @@ public enum CLIUsage {
             Options (* = default):
             \(optionLines.joined(separator: "\n"))
 
-            --display active: display of the focused window (needs Accessibility permission),
-              falling back to the frontmost app's window, then the display under the mouse.
+            --display active: display with the active menu bar (where keyboard focus is, as in yabai),
+              falling back to the focused window, the frontmost app's window, then the mouse.
             """
     }
 }

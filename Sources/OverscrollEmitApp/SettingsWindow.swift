@@ -150,7 +150,7 @@ struct SettingsView: View {
                         }
                     }
                     Text(
-                        "Used to find the display of the focused window (`--display active`). Without it, Overscroll Emit falls back to the frontmost app's window, then the display under the mouse."
+                        "Optional. `--display active` uses the display with the active menu bar; Accessibility is only a fallback for finding the focused window if that lookup fails."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         server = RequestServer { [weak self] command in
-            guard let self else { return "app is shutting down" }
+            guard let self else { return .failure(CommandFailure(message: "app is shutting down")) }
             return self.handle(command)
         }
         // Manual launch (Finder / open) shows settings; CLI-triggered and login launches stay silent.
@@ -33,24 +33,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    /// Returns an error message, or nil on success.
-    private func handle(_ command: AppCommand) -> String? {
+    /// Success carries optional text for the CLI to print.
+    private func handle(_ command: AppCommand) -> Result<String?, CommandFailure> {
         switch command {
         case .flash(let request):
-            switch ScreenResolver.resolve(request.display) {
-            case .success(let screen):
-                presenter.present(on: screen, side: request.side, style: request.style)
-                return nil
-            case .failure(let error):
-                return error.message
-            }
+            return ScreenResolver.resolve(request.display)
+                .map { screen in
+                    presenter.present(on: screen, side: request.side, style: request.style)
+                    return nil
+                }
+                .mapError { CommandFailure(message: $0.message) }
         case .settings:
             settings.show()
-            return nil
+            return .success(nil)
         case .quit:
             // Let the ack go out before terminating.
             DispatchQueue.main.async { NSApp.terminate(nil) }
-            return nil
+            return .success(nil)
+        case .describeDisplays:
+            return .success(ScreenResolver.describe())
         }
     }
 

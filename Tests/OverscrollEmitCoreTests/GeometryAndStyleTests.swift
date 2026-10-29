@@ -62,7 +62,7 @@ import Testing
     @Test func envelopeRoundTrips() {
         let envelope = RequestEnvelope(id: "abc", command: .flash(FlashRequest(side: .right, display: .index(2), style: .standard)))
         #expect(IPCCodec.encode(envelope).flatMap { IPCCodec.decode(RequestEnvelope.self, from: $0) } == envelope)
-        let ack = AckEnvelope(id: "abc", error: "nope")
+        let ack = AckEnvelope(id: "abc", error: "nope", output: "text")
         #expect(IPCCodec.encode(ack).flatMap { IPCCodec.decode(AckEnvelope.self, from: $0) } == ack)
     }
 }

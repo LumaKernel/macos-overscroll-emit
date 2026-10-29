@@ -30,17 +30,6 @@ func printVersion() {
     print("overscroll-emit \(version) (build \(build))")
 }
 
-func printDisplays() {
-    let screens = NSScreen.screens
-    let mouse = Geometry.screenIndex(containing: NSEvent.mouseLocation, screens: screens.map(\.frame))
-    for (offset, screen) in screens.enumerated() {
-        let f = screen.frame
-        let marks = [offset == 0 ? "primary" : nil, offset == mouse ? "mouse" : nil].compactMap { $0 }
-        let suffix = marks.isEmpty ? "" : "  [\(marks.joined(separator: ", "))]"
-        print("\(offset + 1): \(screen.localizedName)  \(Int(f.width))x\(Int(f.height)) at (\(Int(f.minX)), \(Int(f.minY)))\(suffix)")
-    }
-}
-
 @MainActor
 final class AckBox {
     var ack: AckEnvelope?
@@ -89,6 +78,7 @@ func send(_ command: AppCommand) -> Never {
     if let launchError = box.launchError { fail("failed to launch OverscrollEmit.app: \(launchError)") }
     guard let ack = box.ack else { fail("OverscrollEmit.app did not respond") }
     if let error = ack.error { fail(error) }
+    if let output = ack.output { print(output) }
     if command == .quit {
         // Wait for the process to exit so an immediately following command relaunches it instead of
         // posting to an instance that is shutting down.
@@ -109,8 +99,6 @@ case .success(.help):
     print(CLIUsage.text)
 case .success(.version):
     printVersion()
-case .success(.displays):
-    printDisplays()
 case .success(.send(let command)):
     send(command)
 }

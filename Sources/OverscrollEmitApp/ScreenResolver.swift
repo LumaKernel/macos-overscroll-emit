@@ -15,6 +15,25 @@ enum ScreenResolveError: Error {
     }
 }
 
+/// How `--display active` picked its display, in fallback order.
+enum ActiveDisplaySource {
+    case menuBar
+    case focusedWindow
+    case frontmostAppWindow
+    case mouse
+    case primary
+
+    var description: String {
+        switch self {
+        case .menuBar: "display with the active menu bar (SkyLight, same as yabai)"
+        case .focusedWindow: "focused window (Accessibility)"
+        case .frontmostAppWindow: "frontmost window of the frontmost app (window list)"
+        case .mouse: "display under the mouse (no window found)"
+        case .primary: "primary display (no window found, mouse off-screen)"
+        }
+    }
+}
+
 @MainActor
 enum ScreenResolver {
     static func resolve(_ target: DisplayTarget) -> Result<NSScreen, ScreenResolveError> {
@@ -30,13 +49,50 @@ enum ScreenResolver {
                 ? .success(screens[n - 1])
                 : .failure(.indexOutOfRange(requested: n, available: screens.count))
         case .active:
-            let frames = screens.map(\.frame)
-            let windowScreen = (focusedWindowRect() ?? frontmostAppWindowRect())
-                .map { Geometry.cocoaRect(fromTopLeft: $0, primaryScreenHeight: primary.frame.height) }
+            return .success(resolveActive(screens: screens, primary: primary).screen)
+        }
+    }
+
+    /// Display list for `overscroll-emit displays`, with the reasoning behind `active`.
+    static func describe() -> String {
+        let screens = NSScreen.screens
+        guard let primary = screens.first else { return "no displays" }
+        let active = resolveActive(screens: screens, primary: primary)
+        let mouse = mouseScreen(screens)
+        let lines = screens.enumerated().map { offset, screen in
+            let f = screen.frame
+            let marks = [
+                screen == primary ? "primary" : nil,
+                screen == active.screen ? "active" : nil,
+                screen == mouse ? "mouse" : nil,
+            ].compactMap { $0 }
+            let suffix = marks.isEmpty ? "" : "  [\(marks.joined(separator: ", "))]"
+            return "\(offset + 1): \(screen.localizedName)  \(Int(f.width))x\(Int(f.height)) at (\(Int(f.minX)), \(Int(f.minY)))\(suffix)"
+        }
+        let frontmost = NSWorkspace.shared.frontmostApplication?.localizedName ?? "none"
+        return
+            (lines + [
+                "",
+                "active: \(active.source.description)",
+                "frontmost app: \(frontmost)",
+                "accessibility: \(AXIsProcessTrusted() ? "granted" : "not granted")",
+            ]).joined(separator: "\n")
+    }
+
+    private static func resolveActive(screens: [NSScreen], primary: NSScreen) -> (screen: NSScreen, source: ActiveDisplaySource) {
+        let frames = screens.map(\.frame)
+        func screen(forTopLeft rect: CGRect?) -> NSScreen? {
+            rect.map { Geometry.cocoaRect(fromTopLeft: $0, primaryScreenHeight: primary.frame.height) }
                 .flatMap { Geometry.bestScreenIndex(for: $0, screens: frames) }
                 .map { screens[$0] }
-            return .success(windowScreen ?? mouseScreen(screens) ?? primary)
         }
+        if let uuid = SkyLight.activeMenuBarDisplayUUID(), let screen = screens.first(where: { $0.displayUUID == uuid }) {
+            return (screen, .menuBar)
+        }
+        if let screen = screen(forTopLeft: focusedWindowRect()) { return (screen, .focusedWindow) }
+        if let screen = screen(forTopLeft: frontmostAppWindowRect()) { return (screen, .frontmostAppWindow) }
+        if let screen = mouseScreen(screens) { return (screen, .mouse) }
+        return (primary, .primary)
     }
 
     private static func mouseScreen(_ screens: [NSScreen]) -> NSScreen? {

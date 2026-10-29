@@ -28,12 +28,13 @@ public enum AppCommand: Equatable, Codable, Sendable {
     case flash(FlashRequest)
     case settings
     case quit
+    /// Lists displays as the app sees them, including which one `--display active` resolves to and why.
+    case describeDisplays
 }
 
 /// Commands handled by the CLI process.
 public enum CLICommand: Equatable, Sendable {
     case send(AppCommand)
-    case displays
     case version
     case help
 }

@@ -28,10 +28,13 @@ public struct AckEnvelope: Equatable, Codable, Sendable {
     public let id: String
     /// nil on success.
     public let error: String?
+    /// Text for the CLI to print on success.
+    public let output: String?
 
-    public init(id: String, error: String?) {
+    public init(id: String, error: String?, output: String?) {
         self.id = id
         self.error = error
+        self.output = output
     }
 }
 

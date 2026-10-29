@@ -54,7 +54,7 @@ import Testing
     @Test func otherCommands() {
         #expect(CLIParser.parse(["settings"]) == .success(.send(.settings)))
         #expect(CLIParser.parse(["quit"]) == .success(.send(.quit)))
-        #expect(CLIParser.parse(["displays"]) == .success(.displays))
+        #expect(CLIParser.parse(["displays"]) == .success(.send(.describeDisplays)))
         #expect(CLIParser.parse(["--version"]) == .success(.version))
         #expect(CLIParser.parse(["-h"]) == .success(.help))
     }
