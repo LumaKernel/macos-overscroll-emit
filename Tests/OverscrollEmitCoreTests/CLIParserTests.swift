@@ -16,7 +16,7 @@ import Testing
         let expected = FlashRequest(
             side: .right,
             display: .index(2),
-            style: GlowStyle(size: .huge, density: .dark, flair: .flashy, speed: .fast, color: .accent)
+            style: GlowStyle(size: .huge, density: .dark, flair: .flashy, speed: .fast, color: .preset(.accent))
         )
         #expect(result == .success(.send(.flash(expected))))
     }
@@ -64,14 +64,25 @@ import Testing
         let requests = [
             FlashRequest(side: .left, display: .active, style: .standard),
             FlashRequest(
-                side: .right, display: .index(3), style: GlowStyle(size: .small, density: .light, flair: .calm, speed: .slow, color: .red)),
+                side: .right, display: .index(3),
+                style: GlowStyle(size: .small, density: .light, flair: .calm, speed: .slow, color: .preset(.red))),
             FlashRequest(
-                side: .left, display: .mouse, style: GlowStyle(size: .medium, density: .dark, flair: .normal, speed: .normal, color: .gray)),
+                side: .left, display: .mouse,
+                style: GlowStyle(size: .medium, density: .dark, flair: .normal, speed: .normal, color: .preset(.gray))),
+            FlashRequest(
+                side: .left, display: .active,
+                style: GlowStyle(size: .large, density: .medium, flair: .flashy, speed: .fast, color: .rainbow)),
+            FlashRequest(
+                side: .right, display: .primary,
+                style: GlowStyle(
+                    size: .medium, density: .medium, flair: .normal, speed: .normal, color: .custom(GlowRGB(red: 255, green: 136, blue: 0)))
+            ),
         ]
         for request in requests {
             #expect(CLIParser.parse(CLIFormatter.arguments(for: request)) == .success(.send(.flash(request))))
         }
         #expect(CLIFormatter.arguments(for: requests[0]) == ["left"])
+        #expect(CLIFormatter.arguments(for: requests[4]) == ["right", "--display=primary", "--color=#ff8800"])
         #expect(CLIFormatter.arguments(for: requests[2]) == ["left", "--display=mouse", "--density=dark"])
     }
 
@@ -79,5 +90,35 @@ import Testing
         for option in FlashOption.allCases {
             #expect(CLIUsage.text.contains("--\(option.rawValue)"))
         }
+    }
+
+    @Test(arguments: [
+        ("rainbow", GlowColor.rainbow),
+        ("#FF8800", .custom(GlowRGB(red: 255, green: 136, blue: 0))),
+        ("00ff7f", .custom(GlowRGB(red: 0, green: 255, blue: 127))),
+        ("purple", .preset(.purple)),
+    ])
+    func colorValues(raw: String, expected: GlowColor) {
+        #expect(
+            CLIParser.parse(["left", "--color", raw])
+                == .success(.send(.flash(FlashRequest(side: .left, display: .active, style: style(color: expected))))))
+    }
+
+    @Test(arguments: ["#ff880", "#ff88001", "#gg0000", "pink", "#"])
+    func invalidColors(raw: String) {
+        #expect(
+            CLIParser.parse(["left", "--color=\(raw)"])
+                == .failure(.invalidValue(option: "color", value: raw, allowed: GlowColor.cliValueDescriptions)))
+    }
+
+    @Test func shellCommandQuotesOnlyWhatNeedsIt() {
+        #expect(CLIFormatter.shellCommand(["overscroll-emit", "left", "--size=large"]) == "overscroll-emit left --size=large")
+        #expect(CLIFormatter.shellCommand(["/Apps/My App.app/x", "--color=#ff8800"]) == "'/Apps/My App.app/x' '--color=#ff8800'")
+        #expect(CLIFormatter.shellCommand(["it's"]) == #"'it'\''s'"#)
+    }
+
+    private func style(color: GlowColor) -> GlowStyle {
+        let s = GlowStyle.standard
+        return GlowStyle(size: s.size, density: s.density, flair: s.flair, speed: s.speed, color: color)
     }
 }

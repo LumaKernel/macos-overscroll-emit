@@ -23,10 +23,6 @@ public enum GlowSpeed: String, CaseIterable, Codable, Sendable {
     case slow, normal, fast
 }
 
-public enum GlowColor: String, CaseIterable, Codable, Sendable {
-    case gray, white, black, accent, blue, red, green, orange, purple
-}
-
 /// Categorical style.
 /// Sync: a new field also needs `GlowParameters.init(style:)`, a `FlashOption` case (+ `CLIParser.parseFlash`),
 /// `SettingsModel` / `SettingsView` preview picker, and `CLIParserTests.formatterRoundTrips`.
@@ -45,7 +41,7 @@ public struct GlowStyle: Equatable, Codable, Sendable {
         self.color = color
     }
 
-    public static let standard = GlowStyle(size: .medium, density: .medium, flair: .normal, speed: .normal, color: .gray)
+    public static let standard = GlowStyle(size: .medium, density: .medium, flair: .normal, speed: .normal, color: .preset(.gray))
 }
 
 /// Numeric animation parameters resolved from a `GlowStyle`.

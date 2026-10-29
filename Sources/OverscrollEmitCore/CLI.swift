@@ -53,7 +53,7 @@ public enum CLIParser {
                 density: try decode(.density, options, default: base.density).get(),
                 flair: try decode(.flair, options, default: base.flair).get(),
                 speed: try decode(.speed, options, default: base.speed).get(),
-                color: try decode(.color, options, default: base.color).get()
+                color: try decodeColor(options[.color], default: base.color).get()
             )
             let display = try decodeDisplay(options[.display]).get()
             return .send(.flash(FlashRequest(side: side, display: display, style: style)))
@@ -95,6 +95,12 @@ public enum CLIParser {
             ?? .failure(.invalidValue(option: option.rawValue, value: raw, allowed: T.allCases.map(\.rawValue)))
     }
 
+    private static func decodeColor(_ raw: String?, default fallback: GlowColor) -> Result<GlowColor, CLIParseError> {
+        guard let raw else { return .success(fallback) }
+        return GlowColor(cliValue: raw).map { .success($0) }
+            ?? .failure(.invalidValue(option: FlashOption.color.rawValue, value: raw, allowed: GlowColor.cliValueDescriptions))
+    }
+
     private static func decodeDisplay(_ raw: String?) -> Result<DisplayTarget, CLIParseError> {
         switch raw {
         case nil, "active": return .success(.active)
@@ -126,10 +132,23 @@ public enum CLIFormatter {
             case .density: (option, style.density == standard.density ? nil : style.density.rawValue)
             case .flair: (option, style.flair == standard.flair ? nil : style.flair.rawValue)
             case .speed: (option, style.speed == standard.speed ? nil : style.speed.rawValue)
-            case .color: (option, style.color == standard.color ? nil : style.color.rawValue)
+            case .color: (option, style.color == standard.color ? nil : style.color.cliValue)
             }
         }
         return [request.side.rawValue] + pairs.compactMap { option, value in value.map { "--\(option.rawValue)=\($0)" } }
+    }
+
+    /// Joins words into a shell command line, single-quoting words that need it.
+    public static func shellCommand(_ words: [String]) -> String {
+        words.map(shellQuote).joined(separator: " ")
+    }
+
+    static func shellQuote(_ word: String) -> String {
+        // `#` and `^` stay quoted: they are comment/glob characters in zsh with some options.
+        let safe = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-./=:,+@%")
+        return !word.isEmpty && word.allSatisfy(safe.contains)
+            ? word
+            : "'" + word.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
 
@@ -148,7 +167,8 @@ public enum CLIUsage {
             case .density: "  --density  \(values(GlowDensity.self, s.density))     (濃さ)"
             case .flair: "  --flair    \(values(GlowFlair.self, s.flair))     (派手さ)"
             case .speed: "  --speed    \(values(GlowSpeed.self, s.speed))"
-            case .color: "  --color    \(values(GlowColor.self, s.color))"
+            case .color:
+                "  --color    \(GlowColor.cliValueDescriptions.map { $0 == s.color.cliValue ? "\($0)*" : $0 }.joined(separator: "|"))"
             }
         }
         return """

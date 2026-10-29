@@ -45,15 +45,34 @@ final class SettingsModel {
     var density = GlowStyle.standard.density
     var flair = GlowStyle.standard.flair
     var speed = GlowStyle.standard.speed
-    var color = GlowStyle.standard.color
+    var colorChoice = ColorChoice(GlowStyle.standard.color)
+    /// Used when `colorChoice` is `.custom`.
+    var customColor = Color(red: 1, green: 0.4, blue: 0.7)
+
+    var commandForm: CommandForm {
+        didSet { UserDefaults.standard.set(commandForm.rawValue, forKey: Self.commandFormKey) }
+    }
+
+    private static let commandFormKey = "commandForm"
 
     init(presenter: GlowPresenter) {
         self.presenter = presenter
+        commandForm = UserDefaults.standard.string(forKey: Self.commandFormKey).flatMap(CommandForm.init(rawValue:)) ?? .onPath
+    }
+
+    var color: GlowColor {
+        switch colorChoice {
+        case .preset(let preset): .preset(preset)
+        case .rainbow: .rainbow
+        case .custom: .custom(GlowRGB(NSColor(customColor)))
+        }
     }
 
     var style: GlowStyle { GlowStyle(size: size, density: density, flair: flair, speed: speed, color: color) }
 
     var cliPath: String { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/overscroll-emit").path }
+
+    var symlinkCommand: String { CLIFormatter.shellCommand(["ln", "-sf", cliPath, "/usr/local/bin/overscroll-emit"]) }
 
     func refresh() {
         accessibilityTrusted = AXIsProcessTrusted()
@@ -94,7 +113,13 @@ final class SettingsModel {
     }
 
     func command(for side: Side) -> String {
-        (["overscroll-emit"] + CLIFormatter.arguments(for: FlashRequest(side: side, display: .active, style: style))).joined(separator: " ")
+        let executable =
+            switch commandForm {
+            case .onPath: "overscroll-emit"
+            case .fullPath: cliPath
+            }
+        return CLIFormatter.shellCommand(
+            [executable] + CLIFormatter.arguments(for: FlashRequest(side: side, display: .active, style: style)))
     }
 
     func copy(_ text: String) {
@@ -153,11 +178,13 @@ struct SettingsView: View {
                     LabeledContent("CLI") {
                         Text(model.cliPath).textSelection(.enabled).font(.caption.monospaced())
                     }
+                    Picker("Copy commands as", selection: $model.commandForm) {
+                        Text("overscroll-emit (symlinked on PATH)").tag(CommandForm.onPath)
+                        Text("Full path (no symlink)").tag(CommandForm.fullPath)
+                    }
                     HStack {
                         Spacer()
-                        Button("Copy symlink command") {
-                            model.copy("ln -sf '\(model.cliPath)' /usr/local/bin/overscroll-emit")
-                        }
+                        Button("Copy symlink command") { model.copy(model.symlinkCommand) }
                     }
                 }
 
@@ -166,7 +193,14 @@ struct SettingsView: View {
                     StylePicker(title: "Density (濃さ)", selection: $model.density)
                     StylePicker(title: "Flair (派手さ)", selection: $model.flair)
                     StylePicker(title: "Speed", selection: $model.speed)
-                    StylePicker(title: "Color", selection: $model.color, segmented: false)
+                    HStack {
+                        Picker("Color", selection: $model.colorChoice) {
+                            ForEach(ColorChoice.all, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        if model.colorChoice == .custom {
+                            ColorPicker("Custom color", selection: $model.customColor, supportsOpacity: false).labelsHidden()
+                        }
+                    }
                     HStack {
                         Button("◀︎ Left") { model.preview(.left) }
                         Button("Right ▶︎") { model.preview(.right) }
@@ -221,16 +255,43 @@ private struct StylePicker<Value: RawRepresentable & CaseIterable & Hashable>: V
 where Value.RawValue == String, Value.AllCases: RandomAccessCollection {
     let title: String
     @Binding var selection: Value
-    var segmented = true
 
     var body: some View {
-        let picker = Picker(title, selection: $selection) {
+        Picker(title, selection: $selection) {
             ForEach(Value.allCases, id: \.self) { Text($0.rawValue).tag($0) }
         }
-        if segmented {
-            picker.pickerStyle(.segmented)
-        } else {
-            picker.pickerStyle(.menu)
+        .pickerStyle(.segmented)
+    }
+}
+
+enum CommandForm: String {
+    /// Assumes `overscroll-emit` is symlinked onto PATH.
+    case onPath
+    /// Absolute path into the app bundle; works without a symlink.
+    case fullPath
+}
+
+/// `GlowColor` without the custom value, so the picker can select "custom" while the color comes from a ColorPicker.
+enum ColorChoice: Hashable {
+    case preset(GlowColorPreset)
+    case rainbow
+    case custom
+
+    static let all: [ColorChoice] = GlowColorPreset.allCases.map(ColorChoice.preset) + [.rainbow, .custom]
+
+    init(_ color: GlowColor) {
+        switch color {
+        case .preset(let preset): self = .preset(preset)
+        case .rainbow: self = .rainbow
+        case .custom: self = .custom
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .preset(let preset): preset.rawValue
+        case .rainbow: "rainbow"
+        case .custom: "custom…"
         }
     }
 }

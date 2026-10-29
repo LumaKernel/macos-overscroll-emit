@@ -54,7 +54,7 @@ import Testing
     private func style(
         size: GlowSize = .medium, density: GlowDensity = .medium, flair: GlowFlair = .normal, speed: GlowSpeed = .normal
     ) -> GlowStyle {
-        GlowStyle(size: size, density: density, flair: flair, speed: speed, color: .gray)
+        GlowStyle(size: size, density: density, flair: flair, speed: speed, color: .preset(.gray))
     }
 }
 

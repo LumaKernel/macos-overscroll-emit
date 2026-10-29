@@ -17,7 +17,7 @@ final class GlowPresenter {
         let key = Key(display: screen.displayID, side: side)
         let overlay = overlays[key] ?? GlowOverlay()
         overlays[key] = overlay
-        overlay.play(screen: screen, side: side, parameters: GlowParameters(style: style), color: style.color.nsColor) { [weak self] in
+        overlay.play(screen: screen, side: side, parameters: GlowParameters(style: style), color: style.color) { [weak self] in
             self?.overlays[key] = nil
         }
     }
@@ -52,7 +52,7 @@ private final class GlowOverlay {
         view.layer?.addSublayer(container)
     }
 
-    func play(screen: NSScreen, side: Side, parameters p: GlowParameters, color: NSColor, onFinish: @escaping @MainActor () -> Void) {
+    func play(screen: NSScreen, side: Side, parameters p: GlowParameters, color: GlowColor, onFinish: @escaping @MainActor () -> Void) {
         generation += 1
         let current = generation
         let currentOpacity = Double(container.presentation()?.opacity ?? 0)
@@ -94,10 +94,34 @@ private final class GlowOverlay {
         container.removeAllAnimations()
         container.opacity = 0
         container.add(group, forKey: "glow")
+        halo.removeAllAnimations()
+        core.removeAllAnimations()
+        if case .rainbow = color.paint {
+            addRainbowAnimation(duration: total, coreOpacity: p.coreOpacity)
+        }
         CATransaction.commit()
     }
 
-    private func layout(side: Side, bounds: CGRect, parameters p: GlowParameters, color: NSColor) {
+    /// Cycles the hue of both gradients; neighbouring gradient stops are offset in hue so several colors show at once.
+    private func addRainbowAnimation(duration: Double, coreOpacity: Double) {
+        let cycles = max(1, duration / Self.rainbowCyclePeriod)
+        let samples = Int((cycles * 12).rounded(.up))
+        let hues = (0...samples).map { Double($0) / Double(samples) * cycles }
+
+        let haloAnimation = CAKeyframeAnimation(keyPath: "colors")
+        haloAnimation.values = hues.map { hue in Self.haloColors { Self.rainbowColor(hue + Double($0) * 0.08) } }
+        haloAnimation.duration = duration
+        halo.add(haloAnimation, forKey: "rainbow")
+
+        let coreAnimation = CAKeyframeAnimation(keyPath: "colors")
+        coreAnimation.values = hues.map { hue in
+            Self.coreColors(strength: coreOpacity) { Self.rainbowColor(hue + 0.15 + Double($0) * 0.08) }
+        }
+        coreAnimation.duration = duration
+        core.add(coreAnimation, forKey: "rainbow")
+    }
+
+    private func layout(side: Side, bounds: CGRect, parameters p: GlowParameters, color: GlowColor) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
@@ -118,17 +142,40 @@ private final class GlowOverlay {
         halo.frame = container.bounds
         halo.startPoint = CGPoint(x: edgeX, y: 0.5)
         halo.endPoint = CGPoint(x: farX, y: 1)
-        halo.colors = [1.0, 0.55, 0.18, 0].map { color.withAlphaComponent($0).cgColor }
+        let colorAt: (Int) -> NSColor =
+            switch color.paint {
+            case .solid(let solid): { _ in solid }
+            // Model value for the first frame; the "rainbow" animation takes over.
+            case .rainbow: { Self.rainbowColor(Double($0) * 0.08) }
+            }
+        halo.colors = Self.haloColors(colorAt)
         halo.locations = [0, 0.25, 0.6, 1]
 
-        let coreColor = color.blended(withFraction: 0.45, of: .white) ?? color
         core.frame = container.bounds
         core.startPoint = CGPoint(x: edgeX, y: 0.5)
         core.endPoint = CGPoint(x: edgeX + (farX - edgeX) * 0.3, y: 0.85)
-        let coreAlphas: [CGFloat] = [p.coreOpacity, p.coreOpacity * 0.4, 0]
-        core.colors = coreAlphas.map { coreColor.withAlphaComponent($0).cgColor }
+        core.colors = Self.coreColors(strength: p.coreOpacity, colorAt)
         core.locations = [0, 0.4, 1]
         core.isHidden = p.coreOpacity == 0
+    }
+
+    private static let rainbowCyclePeriod = 1.2
+
+    private static func haloColors(_ colorAt: (Int) -> NSColor) -> [CGColor] {
+        let alphas: [CGFloat] = [1, 0.55, 0.18, 0]
+        return alphas.enumerated().map { colorAt($0.offset).withAlphaComponent($0.element).cgColor }
+    }
+
+    private static func coreColors(strength: Double, _ colorAt: (Int) -> NSColor) -> [CGColor] {
+        let alphas: [CGFloat] = [strength, strength * 0.4, 0]
+        return alphas.enumerated().map { index, alpha in
+            let base = colorAt(index)
+            return (base.blended(withFraction: 0.45, of: .white) ?? base).withAlphaComponent(alpha).cgColor
+        }
+    }
+
+    private static func rainbowColor(_ hue: Double) -> NSColor {
+        NSColor(hue: hue.truncatingRemainder(dividingBy: 1), saturation: 0.85, brightness: 1, alpha: 1)
     }
 }
 
@@ -138,7 +185,34 @@ extension NSScreen {
     }
 }
 
+enum GlowPaint {
+    case solid(NSColor)
+    case rainbow
+}
+
 extension GlowColor {
+    var paint: GlowPaint {
+        switch self {
+        case .preset(let preset): .solid(preset.nsColor)
+        case .rainbow: .rainbow
+        case .custom(let rgb): .solid(rgb.nsColor)
+        }
+    }
+}
+
+extension GlowRGB {
+    var nsColor: NSColor {
+        NSColor(srgbRed: CGFloat(red) / 255, green: CGFloat(green) / 255, blue: CGFloat(blue) / 255, alpha: 1)
+    }
+
+    init(_ color: NSColor) {
+        let srgb = color.usingColorSpace(.sRGB) ?? color
+        func byte(_ component: CGFloat) -> UInt8 { UInt8((min(max(component, 0), 1) * 255).rounded()) }
+        self.init(red: byte(srgb.redComponent), green: byte(srgb.greenComponent), blue: byte(srgb.blueComponent))
+    }
+}
+
+extension GlowColorPreset {
     var nsColor: NSColor {
         switch self {
         case .gray: NSColor(white: 0.55, alpha: 1)

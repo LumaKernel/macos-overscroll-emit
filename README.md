@@ -6,6 +6,8 @@ Shows a macOS-style "end of scroll" edge glow on demand, from the command line.
 ./scripts/build.sh
 build/OverscrollEmit.app/Contents/Helpers/overscroll-emit left
 build/OverscrollEmit.app/Contents/Helpers/overscroll-emit right --display 2 --size large --density dark --flair flashy --color accent
+build/OverscrollEmit.app/Contents/Helpers/overscroll-emit left --color rainbow
+build/OverscrollEmit.app/Contents/Helpers/overscroll-emit left --color=#ff8800   # use = so the shell does not treat # as a comment
 ```
 
 ```
@@ -23,7 +25,7 @@ Options (* = default):
   --density  light|medium*|dark     (濃さ)
   --flair    calm|normal*|flashy     (派手さ)
   --speed    slow|normal*|fast
-  --color    gray*|white|black|accent|blue|red|green|orange|purple
+  --color    gray*|white|black|accent|blue|red|green|orange|purple|rainbow|#RRGGBB
 ```
 
 The CLI starts OverscrollEmit.app in the background on first use. Opening OverscrollEmit.app directly shows its settings (Accessibility permission for `--display active`, launch at login, a style preview).

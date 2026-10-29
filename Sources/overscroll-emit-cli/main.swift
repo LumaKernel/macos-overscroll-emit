@@ -89,6 +89,15 @@ func send(_ command: AppCommand) -> Never {
     if let launchError = box.launchError { fail("failed to launch OverscrollEmit.app: \(launchError)") }
     guard let ack = box.ack else { fail("OverscrollEmit.app did not respond") }
     if let error = ack.error { fail(error) }
+    if command == .quit {
+        // Wait for the process to exit so an immediately following command relaunches it instead of
+        // posting to an instance that is shutting down.
+        let quitDeadline = Date().addingTimeInterval(5)
+        while !NSRunningApplication.runningApplications(withBundleIdentifier: IPC.bundleIdentifier).isEmpty {
+            guard Date() < quitDeadline else { fail("OverscrollEmit.app acknowledged quit but is still running") }
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        }
+    }
     exit(0)
 }
 
