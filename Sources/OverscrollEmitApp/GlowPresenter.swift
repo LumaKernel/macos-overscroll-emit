@@ -125,7 +125,8 @@ private final class GlowOverlay {
         core.frame = container.bounds
         core.startPoint = CGPoint(x: edgeX, y: 0.5)
         core.endPoint = CGPoint(x: edgeX + (farX - edgeX) * 0.3, y: 0.85)
-        core.colors = [p.coreOpacity, p.coreOpacity * 0.4, 0].map { coreColor.withAlphaComponent($0).cgColor }
+        let coreAlphas: [CGFloat] = [p.coreOpacity, p.coreOpacity * 0.4, 0]
+        core.colors = coreAlphas.map { coreColor.withAlphaComponent($0).cgColor }
         core.locations = [0, 0.4, 1]
         core.isHidden = p.coreOpacity == 0
     }
