@@ -184,7 +184,7 @@ public enum CLIUsage {
             \(optionLines.joined(separator: "\n"))
 
             --display active: display with the active menu bar (where keyboard focus is, as in yabai),
-              falling back to the focused window, the frontmost app's window, then the mouse.
+              falling back to the frontmost app's window, then the mouse.
             """
     }
 }

@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import OverscrollEmitCore
 import ServiceManagement
 import SwiftUI
@@ -36,7 +35,6 @@ final class SettingsWindowController {
 final class SettingsModel {
     private let presenter: GlowPresenter
 
-    private(set) var accessibilityTrusted = AXIsProcessTrusted()
     private(set) var loginItemStatus = SMAppService.mainApp.status
     private(set) var loginItemError: String?
 
@@ -75,18 +73,7 @@ final class SettingsModel {
     var symlinkCommand: String { CLIFormatter.shellCommand(["ln", "-sf", cliPath, "/usr/local/bin/overscroll-emit"]) }
 
     func refresh() {
-        accessibilityTrusted = AXIsProcessTrusted()
         loginItemStatus = SMAppService.mainApp.status
-    }
-
-    func requestAccessibility() {
-        // Literal value of kAXTrustedCheckOptionPrompt (the global is not concurrency-safe in Swift 6).
-        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-        accessibilityTrusted = AXIsProcessTrustedWithOptions(options)
-    }
-
-    func openAccessibilitySettings() {
-        open("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
     }
 
     func openLoginItemsSettings() {
@@ -126,11 +113,6 @@ final class SettingsModel {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }
-
-    private func open(_ url: String) {
-        guard let url = URL(string: url) else { return }
-        NSWorkspace.shared.open(url)
-    }
 }
 
 struct SettingsView: View {
@@ -139,23 +121,6 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                Section("Permissions") {
-                    LabeledContent("Accessibility") {
-                        HStack {
-                            StatusBadge(ok: model.accessibilityTrusted, okText: "Granted", ngText: "Not granted")
-                            if !model.accessibilityTrusted {
-                                Button("Request…") { model.requestAccessibility() }
-                            }
-                            Button("Open Settings") { model.openAccessibilitySettings() }
-                        }
-                    }
-                    Text(
-                        "Optional. `--display active` uses the display with the active menu bar; Accessibility is only a fallback for finding the focused window if that lookup fails."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
                 Section("General") {
                     Toggle(
                         "Launch at login",
@@ -229,7 +194,7 @@ struct SettingsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
         }
-        .frame(width: 520, height: 760)
+        .frame(width: 520, height: 660)
         .task {
             // Permissions can change in System Settings while the window is open.
             while !Task.isCancelled {
@@ -237,17 +202,6 @@ struct SettingsView: View {
                 try? await Task.sleep(for: .seconds(1))
             }
         }
-    }
-}
-
-private struct StatusBadge: View {
-    let ok: Bool
-    let okText: String
-    let ngText: String
-
-    var body: some View {
-        Label(ok ? okText : ngText, systemImage: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-            .foregroundStyle(ok ? .green : .orange)
     }
 }
 

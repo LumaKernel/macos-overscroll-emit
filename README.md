@@ -28,7 +28,7 @@ Options (* = default):
   --color    gray*|white|black|accent|blue|red|green|orange|purple|rainbow|#RRGGBB
 ```
 
-The CLI starts OverscrollEmit.app in the background on first use. Opening OverscrollEmit.app directly shows its settings (Accessibility permission for `--display active`, launch at login, a style preview).
+The CLI starts OverscrollEmit.app in the background on first use. Opening OverscrollEmit.app directly shows its settings (launch at login, CLI path, a style preview). No permissions are needed.
 
 Install: `INSTALL_DIR=/Applications BIN_DIR=/usr/local/bin ./scripts/install.sh`
 

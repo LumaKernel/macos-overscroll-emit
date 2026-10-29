@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import OverscrollEmitCore
 
 enum ScreenResolveError: Error {
@@ -18,7 +17,6 @@ enum ScreenResolveError: Error {
 /// How `--display active` picked its display, in fallback order.
 enum ActiveDisplaySource {
     case menuBar
-    case focusedWindow
     case frontmostAppWindow
     case mouse
     case primary
@@ -26,7 +24,6 @@ enum ActiveDisplaySource {
     var description: String {
         switch self {
         case .menuBar: "display with the active menu bar (SkyLight, same as yabai)"
-        case .focusedWindow: "focused window (Accessibility)"
         case .frontmostAppWindow: "frontmost window of the frontmost app (window list)"
         case .mouse: "display under the mouse (no window found)"
         case .primary: "primary display (no window found, mouse off-screen)"
@@ -75,7 +72,6 @@ enum ScreenResolver {
                 "",
                 "active: \(active.source.description)",
                 "frontmost app: \(frontmost)",
-                "accessibility: \(AXIsProcessTrusted() ? "granted" : "not granted")",
             ]).joined(separator: "\n")
     }
 
@@ -89,7 +85,6 @@ enum ScreenResolver {
         if let uuid = SkyLight.activeMenuBarDisplayUUID(), let screen = screens.first(where: { $0.displayUUID == uuid }) {
             return (screen, .menuBar)
         }
-        if let screen = screen(forTopLeft: focusedWindowRect()) { return (screen, .focusedWindow) }
         if let screen = screen(forTopLeft: frontmostAppWindowRect()) { return (screen, .frontmostAppWindow) }
         if let screen = mouseScreen(screens) { return (screen, .mouse) }
         return (primary, .primary)
@@ -97,17 +92,6 @@ enum ScreenResolver {
 
     private static func mouseScreen(_ screens: [NSScreen]) -> NSScreen? {
         Geometry.screenIndex(containing: NSEvent.mouseLocation, screens: screens.map(\.frame)).map { screens[$0] }
-    }
-
-    /// Focused window of the frontmost app via Accessibility (top-left global coords). Needs AX trust.
-    private static func focusedWindowRect() -> CGRect? {
-        guard AXIsProcessTrusted(), let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return nil }
-        let app = AXUIElementCreateApplication(pid)
-        guard let window = copyAttribute(app, kAXFocusedWindowAttribute).flatMap(asAXUIElement),
-            let position = copyAttribute(window, kAXPositionAttribute).flatMap({ axValue($0, CGPoint.zero, .cgPoint) }),
-            let size = copyAttribute(window, kAXSizeAttribute).flatMap({ axValue($0, CGSize.zero, .cgSize) })
-        else { return nil }
-        return CGRect(origin: position, size: size)
     }
 
     /// Front-most normal-layer window of the frontmost app (top-left global coords). No permission needed for bounds.
@@ -121,19 +105,4 @@ enum ScreenResolver {
             .first
     }
 
-    private static func copyAttribute(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {
-        var value: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
-        return result == .success ? value : nil
-    }
-
-    private static func asAXUIElement(_ value: CFTypeRef) -> AXUIElement? {
-        CFGetTypeID(value) == AXUIElementGetTypeID() ? unsafeDowncast(value, to: AXUIElement.self) : nil
-    }
-
-    private static func axValue<T: BitwiseCopyable>(_ value: CFTypeRef, _ initial: T, _ type: AXValueType) -> T? {
-        guard CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
-        var result = initial
-        return AXValueGetValue(unsafeDowncast(value, to: AXValue.self), type, &result) ? result : nil
-    }
 }

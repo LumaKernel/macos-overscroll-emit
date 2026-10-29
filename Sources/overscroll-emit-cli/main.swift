@@ -2,7 +2,7 @@ import AppKit
 import OverscrollEmitCore
 
 // Lives at OverscrollEmit.app/Contents/Helpers/overscroll-emit (usually symlinked onto PATH).
-// Effects are rendered by the resident app (which holds the Accessibility permission);
+// Effects are rendered by the resident app (it owns the overlay windows);
 // this process only forwards requests to it, launching it in the background if needed.
 
 func fail(_ message: String, code: Int32 = 1) -> Never {

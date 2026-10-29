@@ -1,7 +1,7 @@
 import CoreGraphics
 
 public enum Geometry {
-    /// Converts a top-left-origin global rect (Accessibility / CGWindowList) into
+    /// Converts a top-left-origin global rect (CGWindowList) into
     /// Cocoa's bottom-left-origin global coordinates.
     public static func cocoaRect(fromTopLeft rect: CGRect, primaryScreenHeight: CGFloat) -> CGRect {
         CGRect(x: rect.minX, y: primaryScreenHeight - rect.maxY, width: rect.width, height: rect.height)
