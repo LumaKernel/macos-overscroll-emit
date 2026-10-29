@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck -x scripts/*.sh
+      - name: actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
+
+  swift:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: ./scripts/select-xcode.sh
+      - name: Format check
+        run: |
+          swift format format -i -r Package.swift Sources Tests
+          git diff --exit-code
+      - name: Lint
+        run: swift format lint --strict -r Package.swift Sources Tests
+      - name: Check (warnings as errors)
+        run: swift build -Xswiftc -warnings-as-errors --build-tests
+      - name: Test
+        run: swift test
+      - name: Build app
+        run: ./scripts/build.sh
+      - name: Package
+        id: package
+        run: echo "zip=$(./scripts/package.sh)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OverscrollEmit.app
+          path: ${{ steps.package.outputs.zip }}
+          if-no-files-found: error

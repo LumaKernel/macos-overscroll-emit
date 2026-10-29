@@ -1,0 +1,5 @@
+- バージョンは `v{n}.0.0` のみ。minor/patch は使わない。リリースごとに `VERSION` の `MAJOR` を上げる。
+- 設定ウィンドウのタイトルに `v{n}`、フッターに `Version {n}.0.0 (Build {コミットハッシュ})` を表示する。値は Info.plist から読み、ハードコードしない。
+- リリースは `v{MAJOR}.0.0` タグの push で行う（`VERSION` と不一致なら CI が失敗する）。
+- 自前 enum の switch に `default:` を書かない。
+- 変更後は `.github/workflows/ci.yml` のチェックを通す。

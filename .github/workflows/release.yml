@@ -1,0 +1,36 @@
+name: Release
+
+# Push a tag `v{MAJOR}.0.0` matching VERSION (see CLAUDE.md "Versioning").
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag matches VERSION
+        run: |
+          source ./VERSION
+          expected="v${MAJOR}.0.0"
+          if [[ "$GITHUB_REF_NAME" != "$expected" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match VERSION ($expected)"
+            exit 1
+          fi
+      - name: Select Xcode
+        run: ./scripts/select-xcode.sh
+      - name: Test
+        run: swift test
+      - name: Build app
+        run: ./scripts/build.sh
+      - name: Package
+        id: package
+        run: echo "zip=$(./scripts/package.sh)" >> "$GITHUB_OUTPUT"
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "${{ steps.package.outputs.zip }}" --title "Overscroll Emit $GITHUB_REF_NAME" --generate-notes --verify-tag
